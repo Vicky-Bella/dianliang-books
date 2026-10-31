@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-title" content="点亮书本">
   <meta name="theme-color" content="#fff6e5">
   <title>点亮你的书本</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=5">
 </head>
 <body>
   <div class="app">
@@ -37,6 +37,7 @@
       <h2 class="shelf-title">我的书架</h2>
       <span class="shelf-extra" id="shelfExtra"></span>
     </div>
+
     <div class="shelf" id="shelf"></div>
   </div>
 
@@ -50,28 +51,28 @@
       <button class="icon-btn" id="formClose" aria-label="关闭">✕</button>
     </div>
     <div class="sheet-body">
-      <label class="field">
+      <div class="field">
         <span class="field-label">书名</span>
         <div class="field-row">
           <input id="fTitle" type="text" placeholder="比如：猜猜我有多爱你" autocomplete="off">
           <button type="button" class="mic-btn" data-target="fTitle" aria-label="用语音说书名">🎤</button>
         </div>
-      </label>
+      </div>
 
-      <label class="field">
+      <div class="field">
         <span class="field-label">作者（可以不填）</span>
         <div class="field-row">
           <input id="fAuthor" type="text" placeholder="这本书是谁写的呀？" autocomplete="off">
           <button type="button" class="mic-btn" data-target="fAuthor" aria-label="用语音说作者">🎤</button>
         </div>
-      </label>
+      </div>
 
-      <label class="field">
+      <div class="field">
         <span class="field-label">读完的日子</span>
         <div class="field-row">
           <input id="fDate" type="date">
         </div>
-      </label>
+      </div>
 
       <div class="field">
         <span class="field-label">读后感（说说书里好玩的事）</span>
@@ -135,10 +136,14 @@
   <div class="backdrop" id="kidBackdrop" hidden></div>
   <div class="dialog" id="kidDialog" hidden role="dialog" aria-modal="true">
     <h2 class="dialog-title" id="kidDialogTitle">谁在读书呀？</h2>
-    <p class="dialog-hint">起个名字，再挑一个喜欢的头像吧。</p>
+    <p class="dialog-hint">起个名字，选一个头像，再选一下年龄吧。</p>
     <input class="dialog-input" id="kidName" type="text" placeholder="小朋友的名字" autocomplete="off">
+    <div class="sub-label">年龄</div>
+    <div class="age-grid" id="ageGrid"></div>
+    <div class="sub-label">头像</div>
     <div class="avatar-grid" id="avatarGrid"></div>
     <button class="primary-btn" id="kidSave" type="button">好的，开始读书</button>
+    <button class="danger-btn" id="kidDelete" type="button" hidden>删除这个小朋友</button>
     <button class="text-btn" id="kidCancel" type="button" hidden>取消</button>
   </div>
 
@@ -155,7 +160,7 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="db.js"></script>
-  <script src="app.js"></script>
+  <script src="db.js?v=5"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

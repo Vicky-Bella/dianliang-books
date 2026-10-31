@@ -87,6 +87,7 @@
     getBooksByChild: getBooksByChild,
     saveChild: function (child) { return put('children', child); },
     saveBook: function (book) { return put('books', book); },
+    deleteChild: function (id) { return remove('children', id); },
     deleteBook: function (id) { return remove('books', id); },
     clearAll: clearAll
   };

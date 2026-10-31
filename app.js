@@ -5,6 +5,9 @@
 
   const $ = function (id) { return document.getElementById(id); };
   const AVATARS = ['🧒', '👧', '🐻', '🐰', '🦊', '🐼', '🦄', '🐯'];
+  const AGE_GROUPS = ['7-8岁', '9-10岁', '11岁以上'];
+  const DEFAULT_AGE = '7-8岁';
+  const BOOK_COLORS = ['#ff8a3d', '#ff7aa2', '#a78bfa', '#38bdf8', '#43c97a', '#ffb703', '#ef6c8f', '#7c8cf0', '#22c55e', '#f97316'];
   const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
 
   const state = {
@@ -17,6 +20,8 @@
     detailBookId: null,
     detailCoverUrl: null,
     kidAvatar: AVATARS[0],
+    kidAge: DEFAULT_AGE,
+    editingKidId: null,
     firstKid: false,
     saving: false
   };
@@ -59,6 +64,15 @@
 
   function pick(list) {
     return list[Math.floor(Math.random() * list.length)];
+  }
+
+  // 根据书名生成稳定的颜色，用于没有封面的书脊
+  function colorFor(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) {
+      h = (h * 31 + str.charCodeAt(i)) >>> 0;
+    }
+    return BOOK_COLORS[h % BOOK_COLORS.length];
   }
 
   function activeChild() {
@@ -108,9 +122,12 @@
     const list = $('kidList');
     list.innerHTML = '';
     state.children.forEach(function (child) {
-      const chip = document.createElement('button');
-      chip.type = 'button';
+      const chip = document.createElement('div');
       chip.className = 'kid-chip' + (child.id === state.activeChildId ? ' active' : '');
+
+      const switchBtn = document.createElement('button');
+      switchBtn.type = 'button';
+      switchBtn.className = 'kid-switch';
 
       const avatar = document.createElement('span');
       avatar.className = 'kid-avatar';
@@ -120,9 +137,9 @@
       name.className = 'kid-name';
       name.textContent = child.name;
 
-      chip.appendChild(avatar);
-      chip.appendChild(name);
-      chip.addEventListener('click', async function () {
+      switchBtn.appendChild(avatar);
+      switchBtn.appendChild(name);
+      switchBtn.addEventListener('click', async function () {
         if (child.id === state.activeChildId) return;
         state.activeChildId = child.id;
         localStorage.setItem('activeChildId', child.id);
@@ -131,6 +148,18 @@
         renderStats();
         renderShelf();
       });
+
+      const editBtn = document.createElement('button');
+      editBtn.type = 'button';
+      editBtn.className = 'kid-edit';
+      editBtn.setAttribute('aria-label', '编辑小朋友');
+      editBtn.textContent = '✎';
+      editBtn.addEventListener('click', function () {
+        openKidDialog(false, child.id);
+      });
+
+      chip.appendChild(switchBtn);
+      chip.appendChild(editBtn);
       list.appendChild(chip);
     });
   }
@@ -173,38 +202,37 @@
     }
 
     state.books.forEach(function (book) {
+      const hasCover = !!book.cover;
       const card = document.createElement('button');
       card.type = 'button';
-      card.className = 'book-card';
+      card.className = 'book-card' + (hasCover ? '' : ' no-cover');
+      if (!hasCover) {
+        card.style.setProperty('--book-color', colorFor(book.title));
+      }
 
-      const coverWrap = document.createElement('div');
-      coverWrap.className = 'book-cover';
+      const inner = document.createElement('div');
+      inner.className = 'book-inner';
 
-      if (book.cover) {
+      if (hasCover) {
         const url = URL.createObjectURL(book.cover);
         state.coverUrls.push(url);
         const img = document.createElement('img');
         img.src = url;
         img.alt = book.title;
-        coverWrap.appendChild(img);
+        inner.appendChild(img);
+
+        const title = document.createElement('div');
+        title.className = 'book-title';
+        title.textContent = book.title;
+        inner.appendChild(title);
       } else {
-        const placeholder = document.createElement('div');
-        placeholder.className = 'cover-placeholder';
-        placeholder.textContent = '📖';
-        coverWrap.appendChild(placeholder);
+        const title = document.createElement('div');
+        title.className = 'book-title';
+        title.textContent = book.title;
+        inner.appendChild(title);
       }
 
-      const title = document.createElement('div');
-      title.className = 'book-title';
-      title.textContent = book.title;
-
-      const date = document.createElement('div');
-      date.className = 'book-date';
-      date.textContent = formatDate(book.finishedAt);
-
-      card.appendChild(coverWrap);
-      card.appendChild(title);
-      card.appendChild(date);
+      card.appendChild(inner);
       card.addEventListener('click', function () { openDetail(book); });
       shelf.appendChild(card);
     });
@@ -406,10 +434,23 @@
   }
 
   /* ==================== 语音输入 ==================== */
+  /*
+    iOS Safari 的 webkitSpeechRecognition 很不稳定：即使给了麦克风权限，
+    也经常报 not-allowed 或直接挂掉。所以策略是：
+      1) 先尝试网页内识别；
+      2) 一旦失败（权限 / 网络 / 系统 bug / 超时 / 抛异常 任意一种），
+         立刻自动切到「系统键盘听写」——把光标放进输入框，弹出键盘，
+         让孩子点键盘下方的麦克风说话。这是 iPad 上 100% 稳定的方案。
+  */
 
   let currentMic = null;
+  let micFallbackTimer = null;
 
   function stopMic() {
+    if (micFallbackTimer) {
+      clearTimeout(micFallbackTimer);
+      micFallbackTimer = null;
+    }
     if (!currentMic) return;
     const rec = currentMic.rec;
     const btn = currentMic.btn;
@@ -418,9 +459,19 @@
     try { rec.abort(); } catch (err) { /* 忽略 */ }
   }
 
+  // 兜底：用 iPad 系统键盘自带的听写（输入法麦克风）
+  function keyboardDictation(target) {
+    target.focus();
+    // 轻提示，告诉孩子键盘上有麦克风
+    toast('点键盘下方的麦克风 🎤，对着说就好啦');
+  }
+
   function startMic(btn, target) {
+    // 先把光标放进去，这样不管后面识别成功失败，键盘都能弹出来
+    target.focus();
+
     if (!SpeechRecognitionCtor) {
-      toast('这台设备不支持网页语音，点一下输入框，用键盘右下角的麦克风说话');
+      keyboardDictation(target);
       return;
     }
     if (currentMic) {
@@ -432,6 +483,7 @@
 
     const base = target.value;
     let finalText = '';
+    let gotResult = false;
     const rec = new SpeechRecognitionCtor();
     rec.lang = 'zh-CN';
     rec.interimResults = true;
@@ -439,10 +491,23 @@
     rec.maxAlternatives = 1;
 
     currentMic = { rec: rec, btn: btn };
-
     btn.classList.add('listening');
 
+    // 安全网：3 秒还没出任何结果，说明网页识别大概率挂了，自动切到键盘听写
+    micFallbackTimer = setTimeout(function () {
+      if (!gotResult) {
+        stopMic();
+        target.value = base + finalText;
+        keyboardDictation(target);
+      }
+    }, 3000);
+
     rec.onresult = function (event) {
+      gotResult = true;
+      if (micFallbackTimer) {
+        clearTimeout(micFallbackTimer);
+        micFallbackTimer = null;
+      }
       let interim = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
@@ -452,30 +517,36 @@
       target.value = base + finalText + interim;
     };
 
-    rec.onerror = function (event) {
-      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-        toast('麦克风没有权限，去 iPad「设置 → Safari → 麦克风」里允许一下');
-      } else if (event.error === 'no-speech') {
-        toast('没有听到声音，再点一次麦克风试试');
-      } else if (event.error === 'network') {
-        toast('语音识别需要联网，检查一下网络');
-      } else {
-        toast('这次没听清，再点一次，或者直接打字');
+    rec.onerror = function () {
+      // 任何错误都不再让用户去设置里折腾，直接切到键盘听写
+      if (micFallbackTimer) {
+        clearTimeout(micFallbackTimer);
+        micFallbackTimer = null;
       }
+      stopMic();
+      target.value = base + finalText;
+      keyboardDictation(target);
     };
 
     rec.onend = function () {
       btn.classList.remove('listening');
       if (currentMic && currentMic.rec === rec) currentMic = null;
+      if (micFallbackTimer) {
+        clearTimeout(micFallbackTimer);
+        micFallbackTimer = null;
+      }
       target.value = base + finalText;
     };
 
     try {
       rec.start();
     } catch (err) {
-      btn.classList.remove('listening');
-      if (currentMic && currentMic.rec === rec) currentMic = null;
-      toast('语音启动失败，点输入框用键盘听写也可以');
+      if (micFallbackTimer) {
+        clearTimeout(micFallbackTimer);
+        micFallbackTimer = null;
+      }
+      stopMic();
+      keyboardDictation(target);
     }
   }
 
@@ -554,20 +625,53 @@
 
   /* ==================== 小朋友档案 ==================== */
 
-  function openKidDialog(isFirst) {
+  function openKidDialog(isFirst, editingId) {
     state.firstKid = isFirst;
+    state.editingKidId = editingId || null;
     state.kidAvatar = AVATARS[0];
+    state.kidAge = DEFAULT_AGE;
     $('kidName').value = '';
-    $('kidDialogTitle').textContent = isFirst ? '谁在读书呀？' : '再添加一位小朋友';
+    $('kidDelete').hidden = true;
+
+    if (editingId) {
+      const child = state.children.find(function (c) { return c.id === editingId; });
+      if (child) {
+        $('kidName').value = child.name;
+        state.kidAvatar = child.avatar || AVATARS[0];
+        state.kidAge = child.ageGroup || DEFAULT_AGE;
+        $('kidDelete').hidden = false;
+      }
+      $('kidDialogTitle').textContent = '编辑小朋友';
+    } else {
+      $('kidDialogTitle').textContent = isFirst ? '谁在读书呀？' : '再添加一位小朋友';
+    }
+
     $('kidCancel').hidden = isFirst;
+    renderAgeGrid();
     renderAvatarGrid();
     show('kidBackdrop', 'kidDialog');
-    if (isFirst) setTimeout(function () { $('kidName').focus(); }, 300);
+    setTimeout(function () { $('kidName').focus(); }, 300);
   }
 
   function closeKidDialog() {
     if (state.firstKid) return;
     hide('kidBackdrop', 'kidDialog');
+  }
+
+  function renderAgeGrid() {
+    const grid = $('ageGrid');
+    grid.innerHTML = '';
+    AGE_GROUPS.forEach(function (age) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'age-btn' + (age === state.kidAge ? ' active' : '');
+      btn.textContent = age;
+      btn.addEventListener('click', function () {
+        state.kidAge = age;
+        renderAgeGrid();
+      });
+      grid.appendChild(btn);
+    });
   }
 
   function renderAvatarGrid() {
@@ -593,10 +697,26 @@
       $('kidName').focus();
       return;
     }
+
+    if (state.editingKidId) {
+      const child = state.children.find(function (c) { return c.id === state.editingKidId; });
+      if (child) {
+        child.name = name;
+        child.avatar = state.kidAvatar;
+        child.ageGroup = state.kidAge;
+        await DB.saveChild(child);
+        hide('kidBackdrop', 'kidDialog');
+        await reloadAll();
+        toast('已更新 ' + name + ' 的档案');
+        return;
+      }
+    }
+
     const child = {
       id: newId(),
       name: name,
       avatar: state.kidAvatar,
+      ageGroup: state.kidAge,
       createdAt: Date.now()
     };
     await DB.saveChild(child);
@@ -606,6 +726,29 @@
     hide('kidBackdrop', 'kidDialog');
     await reloadAll();
     toast('你好，' + name + '！开始点亮第一本书吧');
+  }
+
+  async function deleteKid() {
+    if (!state.editingKidId) return;
+    const child = state.children.find(function (c) { return c.id === state.editingKidId; });
+    if (!child) return;
+    if (!window.confirm('删除 ' + child.name + ' 会同时删掉 TA 的所有读书记录，确定吗？')) return;
+
+    const books = await DB.getBooksByChild(child.id);
+    for (const book of books) {
+      await DB.deleteBook(book.id);
+    }
+    await DB.deleteChild(child.id);
+    if (state.activeChildId === child.id) {
+      state.activeChildId = null;
+    }
+    hide('kidBackdrop', 'kidDialog');
+    await reloadAll();
+    if (!state.children.length) {
+      openKidDialog(true);
+    } else {
+      toast('已删除 ' + child.name);
+    }
   }
 
   /* ==================== 备份与恢复 ==================== */
@@ -696,6 +839,7 @@
           id: child.id,
           name: child.name,
           avatar: child.avatar || '🧒',
+          ageGroup: child.ageGroup || DEFAULT_AGE,
           createdAt: child.createdAt || Date.now()
         });
       }
@@ -756,6 +900,7 @@
     $('kidSave').addEventListener('click', saveKid);
     $('kidCancel').addEventListener('click', closeKidDialog);
     $('kidBackdrop').addEventListener('click', closeKidDialog);
+    $('kidDelete').addEventListener('click', deleteKid);
 
     $('detailClose').addEventListener('click', closeDetail);
     $('detailBackdrop').addEventListener('click', closeDetail);
