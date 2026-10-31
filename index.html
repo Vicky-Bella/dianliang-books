@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="点亮书本">
+  <meta name="theme-color" content="#fff6e5">
+  <title>点亮你的书本</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand"><span class="brand-icon">💡</span><span>点亮你的书本</span></div>
+      <button class="icon-btn" id="backupBtn" aria-label="备份与恢复">💾</button>
+    </header>
+
+    <div class="kid-bar">
+      <div class="kid-list" id="kidList"></div>
+      <button class="kid-add" id="addKidBtn" type="button">＋ 添加小朋友</button>
+    </div>
+
+    <section class="stats-card">
+      <div class="stat">
+        <div class="stat-num" id="statTotal">0</div>
+        <div class="stat-label">本已经点亮</div>
+      </div>
+      <div class="stat-sep"></div>
+      <div class="stat">
+        <div class="stat-num" id="statMonth">0</div>
+        <div class="stat-label">这个月读完</div>
+      </div>
+    </section>
+
+    <div class="shelf-head">
+      <h2 class="shelf-title">我的书架</h2>
+      <span class="shelf-extra" id="shelfExtra"></span>
+    </div>
+    <div class="shelf" id="shelf"></div>
+  </div>
+
+  <button class="fab" id="addBookBtn" type="button">✨ 点亮一本书</button>
+
+  <!-- 录入表单 -->
+  <div class="backdrop" id="formBackdrop" hidden></div>
+  <section class="sheet" id="formSheet" hidden role="dialog" aria-modal="true" aria-label="记录一本读完的书">
+    <div class="sheet-head">
+      <h2 class="sheet-title">记录一本读完的书</h2>
+      <button class="icon-btn" id="formClose" aria-label="关闭">✕</button>
+    </div>
+    <div class="sheet-body">
+      <label class="field">
+        <span class="field-label">书名</span>
+        <div class="field-row">
+          <input id="fTitle" type="text" placeholder="比如：猜猜我有多爱你" autocomplete="off">
+          <button type="button" class="mic-btn" data-target="fTitle" aria-label="用语音说书名">🎤</button>
+        </div>
+      </label>
+
+      <label class="field">
+        <span class="field-label">作者（可以不填）</span>
+        <div class="field-row">
+          <input id="fAuthor" type="text" placeholder="这本书是谁写的呀？" autocomplete="off">
+          <button type="button" class="mic-btn" data-target="fAuthor" aria-label="用语音说作者">🎤</button>
+        </div>
+      </label>
+
+      <label class="field">
+        <span class="field-label">读完的日子</span>
+        <div class="field-row">
+          <input id="fDate" type="date">
+        </div>
+      </label>
+
+      <div class="field">
+        <span class="field-label">读后感（说说书里好玩的事）</span>
+        <div class="field-row textarea-row">
+          <textarea id="fReview" placeholder="这本书里，你最喜欢什么？"></textarea>
+          <button type="button" class="mic-btn" data-target="fReview" aria-label="用语音说读后感">🎤</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="field-label">书本封面（拍一张更好看）</span>
+        <div class="cover-picker">
+          <div class="cover-preview" id="coverPreview">📷</div>
+          <div class="cover-actions">
+            <button type="button" class="ghost-btn" id="cameraBtn">📷 拍照</button>
+            <button type="button" class="ghost-btn" id="albumBtn">🖼 相册</button>
+            <button type="button" class="ghost-btn" id="coverClear" hidden>取消照片</button>
+          </div>
+        </div>
+        <input type="file" id="cameraInput" accept="image/*" capture="environment" hidden>
+        <input type="file" id="albumInput" accept="image/*" hidden>
+      </div>
+    </div>
+    <div class="sheet-foot">
+      <button class="primary-btn" id="saveBook" type="button">✓ 保存，点亮这本书</button>
+    </div>
+  </section>
+
+  <!-- 书本详情 -->
+  <div class="backdrop" id="detailBackdrop" hidden></div>
+  <section class="sheet" id="detailSheet" hidden role="dialog" aria-modal="true" aria-label="书本详情">
+    <div class="sheet-head">
+      <h2 class="sheet-title" id="detailTitle">书</h2>
+      <button class="icon-btn" id="detailClose" aria-label="关闭">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="detail-cover" id="detailCover"></div>
+      <p class="detail-author" id="detailAuthor"></p>
+      <p class="detail-date" id="detailDate"></p>
+      <div class="detail-review-wrap" id="detailReviewWrap" hidden>
+        <div class="field-label">我的读后感</div>
+        <p class="detail-review" id="detailReview"></p>
+      </div>
+      <button class="danger-btn" id="deleteBook" type="button">删除这条记录</button>
+    </div>
+  </section>
+
+  <!-- 庆祝夸奖 -->
+  <div class="celebration" id="celebration" hidden>
+    <div class="confetti" id="confetti"></div>
+    <div class="celebration-card">
+      <div class="celebration-emoji">🎉</div>
+      <div class="celebration-count" id="celebrateCount">第 1 本！</div>
+      <p class="celebration-text" id="celebrateText"></p>
+      <div class="celebration-book" id="celebrateBook"></div>
+      <button class="primary-btn" id="celebrateClose" type="button">继续点亮 ✨</button>
+    </div>
+  </div>
+
+  <!-- 小朋友档案 -->
+  <div class="backdrop" id="kidBackdrop" hidden></div>
+  <div class="dialog" id="kidDialog" hidden role="dialog" aria-modal="true">
+    <h2 class="dialog-title" id="kidDialogTitle">谁在读书呀？</h2>
+    <p class="dialog-hint">起个名字，再挑一个喜欢的头像吧。</p>
+    <input class="dialog-input" id="kidName" type="text" placeholder="小朋友的名字" autocomplete="off">
+    <div class="avatar-grid" id="avatarGrid"></div>
+    <button class="primary-btn" id="kidSave" type="button">好的，开始读书</button>
+    <button class="text-btn" id="kidCancel" type="button" hidden>取消</button>
+  </div>
+
+  <!-- 备份与恢复 -->
+  <div class="backdrop" id="backupBackdrop" hidden></div>
+  <div class="dialog" id="backupDialog" hidden role="dialog" aria-modal="true">
+    <h2 class="dialog-title">备份与恢复</h2>
+    <p class="dialog-hint">所有记录只保存在这台 iPad 上。定期导出一份备份，换设备时导入就能恢复。</p>
+    <button class="primary-btn" id="exportBtn" type="button">⬇️ 导出备份文件</button>
+    <button class="primary-btn alt" id="importBtn" type="button">⬆️ 导入备份文件</button>
+    <input type="file" id="importInput" accept="application/json,.json" hidden>
+    <button class="text-btn" id="backupClose" type="button">关闭</button>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="db.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
