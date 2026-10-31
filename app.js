@@ -165,12 +165,18 @@
   }
 
   function renderStats() {
-    $('statTotal').textContent = state.books.length;
-    const month = todayStr().slice(0, 7);
+    const today = todayStr();
+    const month = today.slice(0, 7);
+    const year = today.slice(0, 4);
     const monthCount = state.books.filter(function (b) {
       return String(b.finishedAt || '').startsWith(month);
     }).length;
+    const yearCount = state.books.filter(function (b) {
+      return String(b.finishedAt || '').startsWith(year);
+    }).length;
     $('statMonth').textContent = monthCount;
+    $('statYear').textContent = yearCount;
+    $('statTotal').textContent = state.books.length;
   }
 
   function revokeCoverUrls() {
@@ -201,40 +207,62 @@
       return;
     }
 
-    state.books.forEach(function (book) {
-      const hasCover = !!book.cover;
-      const card = document.createElement('button');
-      card.type = 'button';
-      card.className = 'book-card' + (hasCover ? '' : ' no-cover');
-      if (!hasCover) {
-        card.style.setProperty('--book-color', colorFor(book.title));
-      }
+    // 每排放 10 本书，立在一块木板上
+    const PER_ROW = 10;
+    const rows = [];
+    for (let i = 0; i < state.books.length; i += PER_ROW) {
+      rows.push(state.books.slice(i, i + PER_ROW));
+    }
 
-      const inner = document.createElement('div');
-      inner.className = 'book-inner';
+    rows.forEach(function (rowBooks) {
+      const row = document.createElement('div');
+      row.className = 'shelf-row';
 
-      if (hasCover) {
-        const url = URL.createObjectURL(book.cover);
-        state.coverUrls.push(url);
-        const img = document.createElement('img');
-        img.src = url;
-        img.alt = book.title;
-        inner.appendChild(img);
+      const booksWrap = document.createElement('div');
+      booksWrap.className = 'shelf-books';
 
-        const title = document.createElement('div');
-        title.className = 'book-title';
-        title.textContent = book.title;
-        inner.appendChild(title);
-      } else {
-        const title = document.createElement('div');
-        title.className = 'book-title';
-        title.textContent = book.title;
-        inner.appendChild(title);
-      }
+      rowBooks.forEach(function (book) {
+        const hasCover = !!book.cover;
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = 'book-card' + (hasCover ? '' : ' no-cover');
+        if (!hasCover) {
+          card.style.setProperty('--book-color', colorFor(book.title));
+        }
 
-      card.appendChild(inner);
-      card.addEventListener('click', function () { openDetail(book); });
-      shelf.appendChild(card);
+        const inner = document.createElement('div');
+        inner.className = 'book-inner';
+
+        if (hasCover) {
+          const url = URL.createObjectURL(book.cover);
+          state.coverUrls.push(url);
+          const img = document.createElement('img');
+          img.src = url;
+          img.alt = book.title;
+          inner.appendChild(img);
+
+          const title = document.createElement('div');
+          title.className = 'book-title';
+          title.textContent = book.title;
+          inner.appendChild(title);
+        } else {
+          const title = document.createElement('div');
+          title.className = 'book-title';
+          title.textContent = book.title;
+          inner.appendChild(title);
+        }
+
+        card.appendChild(inner);
+        card.addEventListener('click', function () { openDetail(book); });
+        booksWrap.appendChild(card);
+      });
+
+      const plank = document.createElement('div');
+      plank.className = 'shelf-plank';
+
+      row.appendChild(booksWrap);
+      row.appendChild(plank);
+      shelf.appendChild(row);
     });
   }
 

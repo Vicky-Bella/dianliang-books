@@ -176,9 +176,9 @@ button, input, textarea {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 40px;
+  gap: 28px;
   margin-top: 6px;
-  padding: 18px 26px;
+  padding: 18px 22px;
   border-radius: 28px;
   background: rgba(255, 255, 255, .8);
   box-shadow: var(--shadow-sm);
@@ -230,53 +230,77 @@ button, input, textarea {
   color: var(--ink-2);
 }
 
+/* ---------- 立体书架 ---------- */
 .shelf {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 22px 18px;
-  padding: 10px 4px 4px;
-}
-
-/* 立在木板上的书 */
-.book-card {
-  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  gap: 22px;
+  padding: 12px 2px 4px;
+}
+
+/* 每一排书 + 下方木板 */
+.shelf-row {
+  display: flex;
+  flex-direction: column;
+}
+
+.shelf-books {
+  display: flex;
+  align-items: flex-end;
+  gap: 5px;
+  padding: 0 6px;
+  min-height: 150px;
+}
+
+/* 木板 */
+.shelf-plank {
+  height: 18px;
+  border-radius: 4px 4px 8px 8px;
+  background:
+    linear-gradient(180deg, #c98a52 0%, #a06a36 45%, #7d4f24 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, .22),
+    inset 0 -3px 6px rgba(0, 0, 0, .25),
+    0 6px 14px rgba(80, 45, 15, .3);
+  position: relative;
+}
+.shelf-plank::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: repeating-linear-gradient(90deg,
+    rgba(0, 0, 0, .05) 0 2px, transparent 2px 14px);
+  opacity: .5;
+}
+
+/* 一本书（竖立） */
+.book-card {
+  position: relative;
+  flex: 0 0 auto;
+  width: 46px;
+  height: 148px;
   padding: 0;
   border: none;
   background: transparent;
   cursor: pointer;
   touch-action: manipulation;
-  -webkit-tap-highlight-color: rgba(255, 138, 61, .15);
+  -webkit-tap-highlight-color: rgba(255, 138, 61, .2);
   transition: transform .18s ease;
 }
 
-.book-card::after {
-  content: '';
-  display: block;
-  width: 100%;
-  height: 16px;
-  margin-top: -2px;
-  border-radius: 6px;
-  background: linear-gradient(180deg, #b97a45 0%, #8c5a30 55%, #6e4422 100%);
-  box-shadow:
-    inset 0 2px 0 rgba(255, 255, 255, .18),
-    0 6px 14px rgba(90, 50, 15, .28);
-}
-
-.book-card:active { transform: translateY(2px) scale(.98); }
+.book-card:active { transform: translateY(3px); }
 
 .book-inner {
   position: relative;
   width: 100%;
-  aspect-ratio: 3 / 4;
-  border-radius: 4px 10px 10px 4px;
+  height: 100%;
+  border-radius: 3px 6px 6px 3px;
   overflow: hidden;
   box-shadow:
-    inset -4px 0 0 rgba(0, 0, 0, .12),
-    inset 2px 0 0 rgba(255, 255, 255, .18),
-    0 8px 16px rgba(60, 40, 15, .28);
+    inset -4px 0 0 rgba(0, 0, 0, .15),
+    inset 3px 0 0 rgba(255, 255, 255, .22),
+    0 6px 12px rgba(60, 40, 15, .3);
 }
 
 .book-inner img {
@@ -286,26 +310,26 @@ button, input, textarea {
   object-fit: cover;
 }
 
-/* 没有封面时：彩色书脊，书名竖排 */
+/* 没封面：彩色书脊，书名竖排 */
 .book-card.no-cover .book-inner {
   background: linear-gradient(90deg,
-    color-mix(in srgb, var(--book-color) 60%, #000),
+    color-mix(in srgb, var(--book-color) 55%, #000),
     var(--book-color) 35%,
     color-mix(in srgb, var(--book-color) 80%, #fff) 70%,
-    color-mix(in srgb, var(--book-color) 55%, #000));
+    color-mix(in srgb, var(--book-color) 50%, #000));
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 14px 6px;
+  padding: 10px 3px;
 }
 
 .book-card.no-cover .book-title {
   color: #fff;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .4);
   writing-mode: vertical-rl;
   text-orientation: upright;
   -webkit-text-orientation: upright;
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 800;
   line-height: 1.15;
   letter-spacing: 1px;
@@ -313,23 +337,27 @@ button, input, textarea {
   overflow: hidden;
 }
 
-/* 有封面时：书名印在封面底部 */
+/* 有封面：书名竖排叠加在封面上 */
 .book-card:not(.no-cover) .book-title {
   position: absolute;
   left: 0;
   right: 0;
+  top: 0;
   bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   margin: 0;
-  padding: 18px 10px 8px;
   color: #fff;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.25;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, .55);
-  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, .55));
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: 1px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .7);
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  -webkit-text-orientation: upright;
+  background: linear-gradient(90deg, rgba(0,0,0,.25), rgba(0,0,0,.05) 40%, rgba(0,0,0,.05) 60%, rgba(0,0,0,.25));
   overflow: hidden;
 }
 
@@ -913,7 +941,9 @@ button, input, textarea {
   .brand-icon { font-size: 24px; }
   .stats-card { gap: 24px; padding: 16px; }
   .stat-num { font-size: 36px; }
-  .shelf { grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  .shelf { gap: 16px; }
+  .book-card { width: 40px; height: 130px; }
+  .shelf-books { min-height: 132px; gap: 4px; }
   .cover-picker { flex-direction: column; align-items: flex-start; }
   .fab { height: 58px; padding: 0 26px; font-size: 18px; }
 }
