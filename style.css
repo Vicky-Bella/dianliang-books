@@ -310,6 +310,14 @@ button, input, textarea {
   object-fit: cover;
 }
 
+/* 老封面还没生成缩略图时的占位（避免出现问号图标） */
+.book-card.thumb-pending .book-inner {
+  background: linear-gradient(90deg, #8f6a45, #c49a6c 40%, #a87a4e);
+}
+.book-card.thumb-pending .book-inner img {
+  opacity: 0;
+}
+
 /* 没封面：彩色书脊，书名竖排 */
 .book-card.no-cover .book-inner {
   background: linear-gradient(90deg,

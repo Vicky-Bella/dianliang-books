@@ -234,11 +234,29 @@
         inner.className = 'book-inner';
 
         if (hasCover) {
-          const url = URL.createObjectURL(book.cover);
-          state.coverUrls.push(url);
           const img = document.createElement('img');
-          img.src = url;
           img.alt = book.title;
+          if (book.thumb) {
+            img.src = book.thumb;
+          } else {
+            // 老数据没有缩略图：先占位，异步生成后回填并写回数据库
+            card.classList.add('thumb-pending');
+            queueThumbnail(book.cover).then(function (dataUrl) {
+              if (dataUrl) {
+                img.src = dataUrl;
+                book.thumb = dataUrl;
+                // 仅在书还在书架里时才回写，避免把刚删掉的书又写回去
+                if (state.books.some(function (b) { return b.id === book.id; })) {
+                  DB.saveBook(book).catch(function () {});
+                }
+              } else {
+                const url = URL.createObjectURL(book.cover);
+                state.coverUrls.push(url);
+                img.src = url;
+              }
+              card.classList.remove('thumb-pending');
+            });
+          }
           inner.appendChild(img);
 
           const title = document.createElement('div');
@@ -372,6 +390,46 @@
     $('coverClear').hidden = false;
   }
 
+  // 生成封面缩略图（dataURL）：书架渲染不依赖 blob 链接，
+  // 避免 iPad 上书本变多后 blob 链接被系统回收、封面变问号。
+  function makeThumbnail(blob) {
+    return new Promise(function (resolve) {
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = function () {
+        try {
+          const longest = Math.max(img.naturalWidth, img.naturalHeight);
+          const scale = Math.min(1, 260 / longest);
+          const w = Math.max(1, Math.round(img.naturalWidth * scale));
+          const h = Math.max(1, Math.round(img.naturalHeight * scale));
+          const canvas = document.createElement('canvas');
+          canvas.width = w;
+          canvas.height = h;
+          canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+          URL.revokeObjectURL(url);
+          resolve(canvas.toDataURL('image/jpeg', 0.72));
+        } catch (err) {
+          URL.revokeObjectURL(url);
+          resolve(null);
+        }
+      };
+      img.onerror = function () {
+        URL.revokeObjectURL(url);
+        resolve(null);
+      };
+      img.src = url;
+    });
+  }
+
+  // 串行生成缩略图：同一时刻只存在一个临时 blob 链接，
+  // 避免老数据一次性创建几十个 blob 链接又被系统回收。
+  let thumbQueue = Promise.resolve();
+  function queueThumbnail(blob) {
+    const run = function () { return makeThumbnail(blob); };
+    thumbQueue = thumbQueue.then(run, run);
+    return thumbQueue;
+  }
+
   function compressImage(file, maxSide, quality) {
     return new Promise(function (resolve, reject) {
       const url = URL.createObjectURL(file);
@@ -436,6 +494,7 @@
     state.saving = true;
     $('saveBook').disabled = true;
     try {
+      const cover = state.pendingCover || null;
       const book = {
         id: newId(),
         childId: state.activeChildId,
@@ -443,7 +502,8 @@
         author: $('fAuthor').value.trim(),
         finishedAt: $('fDate').value || todayStr(),
         review: $('fReview').value.trim(),
-        cover: state.pendingCover || null,
+        cover: cover,
+        thumb: cover ? await makeThumbnail(cover) : null,
         createdAt: Date.now()
       };
       await DB.saveBook(book);
